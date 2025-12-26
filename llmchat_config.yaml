@@ -1,0 +1,10 @@
+# LLM Chat Configuration
+# See llmchat.md for full specification
+
+model: "openai/gpt-oss-120b"
+system_prompt: "You are a helpful AI assistant."
+reasoning_level: "medium"  # low, medium, high
+max_new_tokens: 32768
+max_history_tokens: null   # null = no limit, or set a number
+show_thinking: true       # Set to true to see chain-of-thought reasoning
+
