@@ -1,0 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+transformers
+torch
+torchvision
+torchaudio
+accelerate
+pyyaml
+kernels
+# flash-attn  # Disabled: requires CUDA 12, DGX Spark has CUDA 13
+# einops      # Dependency of flash-attn
