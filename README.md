@@ -95,4 +95,4 @@ kernels
 
 ## License
 
-See individual file headers for license information.
+MIT License
