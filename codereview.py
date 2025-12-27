@@ -38,7 +38,7 @@ class CodeReviewer:
         print(f"[INFO] Target Device: {self.device}")
         
         try:
-            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
+            self.tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True, local_files_only=True)
             
             # Using device_map="cuda:0" and bfloat16 as per spec
             self.model = AutoModelForCausalLM.from_pretrained(
@@ -46,6 +46,10 @@ class CodeReviewer:
                 torch_dtype=torch.bfloat16,
                 device_map=self.device,
                 trust_remote_code=True,
+                use_safetensors=True,
+                low_cpu_mem_usage=True,
+                attn_implementation="sdpa",
+                local_files_only=True,
             )
             print("[INFO] Model loaded successfully!")
         except Exception as e:
