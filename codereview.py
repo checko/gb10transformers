@@ -80,15 +80,23 @@ class CodeReviewer:
         # Construct Prompt
         system_prompt = (
             "You are an expert Senior Software Engineer and Security Auditor.\n"
-            "Your task is to review the provided source code and insert inline comments where issues are found.\n"
+            "Your task is to review the provided source code and produce a UNIFIED DIFF that inserts comments where issues are found.\n"
             "\n"
             "OUTPUT INSTRUCTIONS:\n"
-            "1. Output the COMPLETE original code. DO NOT TRUNCATE any part of the file.\n"
-            f"2. Insert review comments using the prefix '{comment_prefix}'.\n"
-            "3. Insert comments immediately BEFORE the line they refer to.\n"
-            "4. Do not remove or modify any original code.\n"
-            "5. Do not wrap the output in Markdown code blocks (like ```python). Just output raw code.\n"
-            "6. IGNORE existing comments in the code that look like issue tags (e.g. '[CRITICAL-1]').\n"
+            "1. Output ONLY a Unified Diff (patch). Do NOT output the full source file.\n"
+            "2. The diff should apply to the original file to add your comments.\n"
+            f"3. Use the comment prefix '{comment_prefix}'.\n"
+            "4. Insert comments immediately BEFORE the line they refer to.\n"
+            "5. Use standard Unified Diff format:\n"
+            "   --- original\n"
+            "   +++ reviewed\n"
+            "   @@ -line,count +line,count @@\n"
+            "    context line\n"
+            "   +comment line\n"
+            "    target line\n"
+            "\n"
+            "6. Do not wrap the output in Markdown code blocks. Just output raw diff text.\n"
+            "7. IGNORE existing comments in the code that look like issue tags (e.g. '[CRITICAL-1]').\n"
             "   You must generate your OWN review comments with the correct prefix.\n"
             "\n"
             "CRITICAL INSTRUCTION: You MUST comment on missing headers.\n"
@@ -123,9 +131,11 @@ class CodeReviewer:
             "- [LOW-1] Naming: Use standard conventions (CamelCase for Java/C++, snake_case for Python).\n"
             "- [LOW-3] Structure: Keep classes in separate files where appropriate.\n"
             "\n"
-            "Example Comment Format:\n"
-            f"{comment_prefix}[CRITICAL-9] Hard-coded secret detected. Move to environment variable.\n"
-            "String secret = \"123456\";"
+            "Example Diff Chunk:\n"
+            "@@ -10,3 +10,4 @@\n"
+            " void function() {\n"
+            f"+{comment_prefix}[CRITICAL-9] Hard-coded secret detected.\n"
+            "     String secret = \"123456\";"
         )
         
         messages = [
@@ -205,8 +215,8 @@ class CodeReviewer:
             self.load_model()
 
         for file_p in files_to_process:
-            # Skip existing review files to avoid loops
-            if file_p.name.endswith("_r"):
+            # Skip existing review files or diffs to avoid loops
+            if file_p.name.endswith(".diff") or file_p.name.endswith("_r"):
                 continue
             
             # Skip hidden files
@@ -217,7 +227,7 @@ class CodeReviewer:
             reviewed_content = self.generate_review(file_p)
             
             if reviewed_content:
-                output_path = file_p.parent / (file_p.name + "_r")
+                output_path = file_p.parent / (file_p.name + ".diff")
                 try:
                     with open(output_path, 'w', encoding='utf-8') as f:
                         f.write(reviewed_content)
