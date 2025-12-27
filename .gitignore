@@ -35,3 +35,6 @@ chat_*.txt
 
 # Error logs
 errorlog*.txt
+
+# Test Review Results
+*_r

@@ -1,0 +1,45 @@
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
+
+// [LOW-3] Multiple classes in file (if public) or just bad structure
+public class BadJava {
+    
+    // [CRITICAL-9] Hard-coded secret
+    private String dbPassword = "password123!";
+
+    public void unsafeSql(String userId) {
+        try {
+            Connection conn = DriverManager.getConnection("jdbc:mysql://localhost/db", "root", dbPassword);
+            Statement stmt = conn.createStatement();
+            
+            // [CRITICAL-7] SQL Injection
+            String sql = "SELECT * FROM users WHERE id = " + userId;
+            stmt.executeQuery(sql);
+            
+            // [HIGH-5] Resource not closed (conn, stmt)
+            
+        } catch (Exception e) {
+            // [HIGH-3] Catch generic Exception and ignore it (empty catch)
+        }
+    }
+
+    public void complexLogic(int x) {
+        // [MEDIUM-3] Deep nesting
+        if (x > 0) {
+            if (x < 100) {
+                if (x % 2 == 0) {
+                    if (x % 3 == 0) {
+                        System.out.println("Complex");
+                    }
+                }
+            }
+        }
+    }
+}
+
+// [LOW-3] Second class in same file
+class AnotherClass {
+    // [LOW-1] Bad variable name
+    public int VAL = 10;
+}

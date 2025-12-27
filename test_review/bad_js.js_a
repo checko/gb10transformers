@@ -1,0 +1,26 @@
+function processUser(user) {
+    // [CRITICAL-9] Hard-coded secret
+    const apiKey = "AIzaSyD-1234567890";
+
+    // [MEDIUM-2] Magic Number
+    if (user.age > 18) {
+        console.log("Adult");
+    }
+
+    // [CRITICAL-10] No input validation
+    eval(user.code); // eval is evil
+
+    // [MEDIUM-3] Complexity
+    if (true) {
+        if (true) {
+            if (true) {
+                if (true) {
+                    console.log("Too deep");
+                }
+            }
+        }
+    }
+}
+
+// [LOW-1] Bad naming
+var X = 10;

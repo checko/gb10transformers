@@ -1,0 +1,37 @@
+import os
+import sqlite3
+
+# [HIGH-1] Global variable
+db_connection = None
+
+def login(user, pwd):
+    # [CRITICAL-9] Hard-coded secret
+    admin_pass = "SuperSecret123"
+    
+    if pwd == admin_pass:
+        print("Admin access granted")
+        
+        # [CRITICAL-7] SQL Injection vulnerability
+        query = "SELECT * FROM users WHERE name = '" + user + "'"
+        cursor = db_connection.execute(query)
+        
+    # [MEDIUM-4] No else/default handling
+    if user == "guest":
+        print("Guest access")
+
+def process_data(data):
+    # [MEDIUM-2] Magic Number
+    if len(data) > 42:
+        # [MEDIUM-3] Deep nesting
+        if data[0] == 'A':
+            if data[1] == 'B':
+                if data[2] == 'C':
+                    if data[3] == 'D':
+                         print("Too deep")
+
+# [LOW-1] Bad naming (snake_case required)
+def BadNamingFunction():
+    # [HIGH-5] Resource management (no close, no with statement)
+    f = open("data.txt", "w")
+    f.write("test")
+    # File not closed
