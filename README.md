@@ -36,6 +36,15 @@ pip install -r requirements.txt
 |------|-------------|
 | `ai_review.py` | GitLab CI code review tool using Ollama/HuggingFace for automated code analysis |
 
+### Code Review
+
+| File | Description |
+|------|-------------|
+| `codereview.py` | AI Code Reviewer using Qwen3-Coder-30B |
+| `run_review.sh` | Execution script for code review (sets env vars) |
+| `check_model_req.py` | VRAM feasibility check for 30B models |
+| `codereview.md` | Feature specification |
+
 ### Test Scripts
 
 | File | Description |
@@ -64,6 +73,23 @@ max_new_tokens: 32768
 max_history_tokens: null     # null = no limit
 show_thinking: true          # Show chain-of-thought reasoning
 ```
+
+## AI Code Review
+
+Run the automated code reviewer on files or directories:
+
+```bash
+# Check VRAM requirements first
+source .venv/bin/activate && python check_model_req.py
+
+# Review a single file (output: file.py_r)
+./run_review.sh file.py
+
+# Review an entire directory recursively
+./run_review.sh ./src
+```
+
+The tool uses `Qwen/Qwen3-Coder-30B-A3B-Instruct` to analyze code for bugs, security risks, and style issues, inserting comments directly into a copy of the source code.
 
 ## Hardware Requirements
 
