@@ -142,14 +142,20 @@ class CodeReviewer:
         
         model_inputs = self.tokenizer([text], return_tensors="pt").to(self.device)
 
+        # Ensure pad_token is set (Qwen sometimes defaults to None)
+        if self.tokenizer.pad_token_id is None:
+            self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+
         # Generate
         # We need a large token limit to accommodate the full file rewrite + comments
         # 8192 is a safe default for modern coding models, but Qwen3 can handle more.
         generated_ids = self.model.generate(
             model_inputs.input_ids,
+            attention_mask=model_inputs.attention_mask,
             max_new_tokens=8192,
             temperature=0.2, # Low temperature for more deterministic/faithful code reproduction
-            do_sample=True 
+            do_sample=True,
+            pad_token_id=self.tokenizer.eos_token_id
         )
         
         # Decode
