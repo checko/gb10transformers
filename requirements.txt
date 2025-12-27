@@ -4,6 +4,7 @@ torch
 torchvision
 torchaudio
 accelerate
+safetensors
 pyyaml
 kernels
 # flash-attn  # Disabled: requires CUDA 12, DGX Spark has CUDA 13
