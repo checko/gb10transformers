@@ -8,6 +8,7 @@ import sys
 import json
 import glob
 import time
+import re
 from pathlib import Path
 from http.client import HTTPConnection
 
@@ -82,6 +83,48 @@ def load_prompt_template(file_extension: str) -> str:
     except FileNotFoundError:
         print(f"[ERROR] Default prompt file '{DEFAULT_RULES_FILE}' not found.")
         sys.exit(1)
+
+def validate_diff(diff_text: str) -> tuple[bool, list[str]]:
+    """
+    Validate that the diff text appears to be a valid unified diff.
+    Returns (is_valid, list of warnings).
+    """
+    warnings = []
+    
+    if not diff_text or not diff_text.strip():
+        return True, []  # Empty diff is valid (no issues found)
+    
+    lines = diff_text.strip().splitlines()
+    
+    # Check for basic diff structure
+    has_minus_header = any(line.startswith('---') for line in lines)
+    has_plus_header = any(line.startswith('+++') for line in lines)
+    has_hunk_header = any(line.startswith('@@') for line in lines)
+    
+    if not has_minus_header:
+        warnings.append("Missing '--- original' header")
+    if not has_plus_header:
+        warnings.append("Missing '+++ reviewed' header")
+    if not has_hunk_header:
+        warnings.append("Missing @@ hunk header")
+    
+    # Check hunk header format: @@ -line,count +line,count @@
+    hunk_pattern = re.compile(r'^@@\s*-\d+(?:,\d+)?\s+\+\d+(?:,\d+)?\s*@@')
+    hunks = [line for line in lines if line.startswith('@@')]
+    for hunk in hunks:
+        if not hunk_pattern.match(hunk):
+            warnings.append(f"Malformed hunk header: {hunk[:50]}...")
+    
+    # Check that diff has actual changes (+ or - lines)
+    has_additions = any(line.startswith('+') and not line.startswith('+++') for line in lines)
+    has_deletions = any(line.startswith('-') and not line.startswith('---') for line in lines)
+    
+    if not has_additions and not has_deletions:
+        warnings.append("Diff has no actual changes (no + or - lines)")
+    
+    is_valid = len(warnings) == 0 or (has_hunk_header and (has_additions or has_deletions))
+    
+    return is_valid, warnings
 
 def send_request(code: str, prompt: str, timeout: int) -> str:
     try:
@@ -205,12 +248,21 @@ def review_file(file_path: Path):
         chunk_diff = send_request(content, current_prompt, dynamic_timeout)
         
         if chunk_diff.strip():
+            # Validate the diff before adding
+            is_valid, diff_warnings = validate_diff(chunk_diff)
+            if diff_warnings:
+                print(f"    [WARN] Diff validation issues: {'; '.join(diff_warnings)}")
             full_diff += f"\n{chunk_diff}\n"
         
         # Move to next chunk (subtract overlap to create sliding window)
         chunk_start = chunk_end + 1 - OVERLAP_SIZE if chunk_end < line_count else line_count + 1
 
     if full_diff.strip():
+        # Final validation of combined diff
+        is_valid, final_warnings = validate_diff(full_diff)
+        if final_warnings:
+            print(f"  [WARN] Final diff has issues: {'; '.join(final_warnings)}")
+        
         output_path = file_path.parent / (file_path.name + ".diff")
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(full_diff.strip())
