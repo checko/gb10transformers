@@ -25,6 +25,7 @@ SUPPORTED_EXTENSIONS = {
 
 # Model Config
 MODEL_ID = "Qwen/Qwen3-Coder-30B-A3B-Instruct"
+CHUNK_SIZE = 500  # Lines per review chunk
 
 class CodeReviewer:
     def __init__(self):
@@ -66,18 +67,16 @@ class CodeReviewer:
         else:
             return "REVIEW: " # Default fallback
 
-    def generate_review(self, file_path: Path) -> str:
-        """Read file and generate review content."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except Exception as e:
-            print(f"[WARN] Could not read {file_path}: {e}")
-            return ""
-
-        comment_prefix = self.get_comment_style(file_path.suffix)
+    def review_chunk(self, content: str, start_line: int, end_line: int, comment_prefix: str, is_first_chunk: bool) -> str:
+        """Generate review for a specific line range."""
         
-        # Construct Prompt
+        header_instruction = ""
+        if is_first_chunk:
+            header_instruction = (
+                "CRITICAL INSTRUCTION: You MUST comment on missing headers.\n"
+                "If the file lacks SPDX, Copyright, or Author headers, insert a comment at the very top of the file.\n"
+            )
+
         system_prompt = (
             "You are an expert Senior Software Engineer and Security Auditor.\n"
             "Your task is to review the provided source code and produce a UNIFIED DIFF that inserts comments where issues are found.\n"
@@ -99,15 +98,16 @@ class CodeReviewer:
             "7. IGNORE existing comments in the code that look like issue tags (e.g. '[CRITICAL-1]').\n"
             "   You must generate your OWN review comments with the correct prefix.\n"
             "\n"
-            "CRITICAL INSTRUCTION: You MUST comment on missing headers.\n"
-            "If the file lacks SPDX, Copyright, or Author headers, insert a comment at the very top of the file.\n"
+            f"FOCUS INSTRUCTION: The full file is provided for context, but you must ONLY review and output diffs for lines {start_line} to {end_line}.\n"
+            "Do NOT output any diff hunks outside this range.\n"
             "\n"
+            f"{header_instruction}\n"
             "REVIEW RULES:\n"
-            "PART 1: HEADERS (MANDATORY CHECKS)\n"
+            "PART 1: HEADERS (MANDATORY CHECKS - Only for first chunk)\n"
             "- [HEADER-1] Check for SPDX-License-Identifier.\n"
             "- [HEADER-2] Check for Copyright notice (ensure year is current).\n"
             "- [HEADER-3] Check for Author information.\n"
-            "   -> IF MISSING: Insert a comment at line 1: '{comment_prefix}[HEADER-X] Missing header...'\n"
+            f"   -> IF MISSING: Insert a comment at line 1: '{comment_prefix}[HEADER-X] Missing header...'.\n"
             "\n"
             "PART 2: CRITICAL RISKS (Must Fix)\n"
             "- [CRITICAL-1] Memory: Check malloc/new return values and free/delete usage.\n"
@@ -128,19 +128,19 @@ class CodeReviewer:
             "- [MEDIUM-4] Control Flow -> Handle default/else cases.\n"
             "\n"
             "PART 5: LOW RISKS (Style)\n"
-            "- [LOW-1] Naming: Use standard conventions (CamelCase for Java/C++, snake_case for Python).\n"
+            "- [LOW-1] Naming: Enforce standard conventions. For Python, flag ONLY if function/variable names are NOT snake_case. For Java/C++, flag ONLY if NOT CamelCase.\n"
             "- [LOW-3] Structure: Keep classes in separate files where appropriate.\n"
-            "\n"
-            "Example Diff Chunk:\n"
-            "@@ -10,3 +10,4 @@\n"
-            " void function() {\n"
-            f"+{comment_prefix}[CRITICAL-9] Hard-coded secret detected.\n"
-            "     String secret = \"123456\";"
         )
+        
+        # Add line numbers to content for the model to see
+        # This helps the model respect the line range
+        # Note: We don't change the actual content input, but we rely on the model counting.
+        # Alternatively, we can prepend line numbers, but that might confuse the diff generation.
+        # Qwen-Coder is good at counting, so we will try raw content first.
         
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": content}
+            {"role": "user", "content": f"Filename: input_file\n\n{content}"}
         ]
 
         # Prepare inputs
@@ -152,18 +152,16 @@ class CodeReviewer:
         
         model_inputs = self.tokenizer([text], return_tensors="pt").to(self.device)
 
-        # Ensure pad_token is set (Qwen sometimes defaults to None)
+        # Ensure pad_token is set
         if self.tokenizer.pad_token_id is None:
             self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
 
         # Generate
-        # We need a large token limit to accommodate the full file rewrite + comments
-        # 8192 is a safe default for modern coding models, but Qwen3 can handle more.
         generated_ids = self.model.generate(
             model_inputs.input_ids,
             attention_mask=model_inputs.attention_mask,
-            max_new_tokens=8192,
-            temperature=0.2, # Low temperature for more deterministic/faithful code reproduction
+            max_new_tokens=4096, # reduced token limit per chunk is fine
+            temperature=0.2, 
             do_sample=True,
             pad_token_id=self.tokenizer.eos_token_id
         )
@@ -175,6 +173,35 @@ class CodeReviewer:
         response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
         
         return self._clean_response(response)
+
+    def generate_review(self, file_path: Path) -> str:
+        """Read file and generate review content in chunks."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception as e:
+            print(f"[WARN] Could not read {file_path}: {e}")
+            return ""
+
+        comment_prefix = self.get_comment_style(file_path.suffix)
+        line_count = len(content.splitlines())
+        
+        print(f"    File has {line_count} lines. Analyzing in chunks of {CHUNK_SIZE} lines...")
+        
+        full_diff = ""
+        
+        for start_line in range(1, line_count + 1, CHUNK_SIZE):
+            end_line = min(start_line + CHUNK_SIZE - 1, line_count)
+            is_first = (start_line == 1)
+            
+            print(f"    -> Processing chunk: Lines {start_line}-{end_line}")
+            
+            chunk_diff = self.review_chunk(content, start_line, end_line, comment_prefix, is_first)
+            
+            if chunk_diff.strip():
+                full_diff += f"\n{chunk_diff}\n"
+                
+        return full_diff.strip()
 
     def _clean_response(self, response: str) -> str:
         """Clean up markdown code blocks if the model included them."""
