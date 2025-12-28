@@ -76,39 +76,61 @@ show_thinking: true          # Show chain-of-thought reasoning
 
 ## AI Code Review
 
-Run the automated code reviewer on files or directories:
+An automated code review system using the Qwen3-Coder-30B model with remote client-server support.
 
+### Quick Start (Local)
 ```bash
-# Check VRAM requirements first
-source .venv/bin/activate && python check_model_req.py
+# Start the server (loads model once)
+./start_server.sh &
 
-# Review a single file (output: file.py_r)
-./run_review.sh file.py
+# Review a file
+python review_client.py file.py
 
-# Review an entire directory recursively
-./run_review.sh ./src
+# Review a directory
+python review_client.py ./src
 ```
 
-### Client-Server Mode (Fast Iteration)
+### Remote Usage
 
-For developing prompts or reviewing many files without reloading the model:
+**On GPU Server (GB10):**
+```bash
+./start_server.sh  # Listens on 0.0.0.0:8000
+```
 
-1. **Start the Server** (Loads model once):
-   ```bash
-   ./start_server.sh &
-   ```
+**On Client Machine (Linux):**
+```bash
+export REVIEW_SERVER_HOST=192.168.x.x
+python review_client.py /path/to/code
+```
 
-2. **Run Client** (Instant reviews):
-   ```bash
-   # Reviews using current prompt_rules.md
-   python review_client.py test_review/bad_python.py
-   ```
+**On Client Machine (Windows):**
+```powershell
+$env:REVIEW_SERVER_HOST = "192.168.x.x"
+python review_client.py C:\path\to\code
+```
 
-3. **Iterate**:
-   - Edit `prompt_rules.md`.
-   - Re-run `review_client.py` to see changes immediately.
+### Features
+- **Language-Specific Rules**: Python, C++, Java, JavaScript, Go, Rust, Shell
+- **Few-Shot Prompting**: Examples improve diff format consistency
+- **Sliding Window**: 50-line overlap captures cross-chunk issues
+- **Global Context**: First 50 lines (imports) prepended to all chunks
+- **Diff Validation**: Validates output for correct unified diff format
 
-The tool uses `Qwen/Qwen3-Coder-30B-A3B-Instruct` to analyze code for bugs, security risks, and style issues, inserting comments directly into a copy of the source code.
+### Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REVIEW_SERVER_HOST` | localhost | Server IP (client) |
+| `REVIEW_SERVER_PORT` | 8000 | Server port (client) |
+| `SERVER_HOST` | 0.0.0.0 | Bind address (server) |
+| `SERVER_PORT` | 8000 | Listen port (server) |
+
+### Client Files (for remote machines)
+Copy to any machine:
+- `review_client.py`
+- `rules/` directory
+- `prompt_rules.md`
+
+The tool uses `Qwen/Qwen3-Coder-30B-A3B-Instruct` to analyze code for bugs, security risks, and style issues.
 
 ## Hardware Requirements
 

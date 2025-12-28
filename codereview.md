@@ -1,56 +1,99 @@
 # AI Code Reviewer Specification
 
 ## Overview
-`codereview.py` is a command-line interface (CLI) tool designed to perform automated code reviews using the **Qwen/Qwen3-Coder-30B-A3B-Instruct** Large Language Model (LLM). It is optimized for the NVIDIA GB10 (Blackwell) architecture.
+A client-server code review system using the **Qwen/Qwen3-Coder-30B-A3B-Instruct** LLM, optimized for NVIDIA GB10 (Blackwell) architecture. The server runs on a GPU machine, while clients can connect remotely from any Linux or Windows machine.
+
+## Architecture
+
+```
+┌─────────────────┐         HTTP          ┌─────────────────┐
+│  review_client  │ ──────────────────────►  model_server   │
+│  (Any Machine)  │     POST /review      │  (GPU Machine)  │
+│  Linux/Windows  │ ◄────────────────────  │  GB10 + 120GB   │
+└─────────────────┘        JSON           └─────────────────┘
+```
 
 ## Features
-- **Input Handling**: Accepts a single file path or a directory path as the first argument.
-- **Recursive Processing**: If a directory is provided, it recursively finds source code files.
-- **In-Place Review**: Generates a new file with the suffix `_r` (e.g., `test.py` -> `test.py_r`) containing the original code interlaced with AI-generated review comments.
-- **Hardware Optimization**: Leverages `torch.bfloat16` and specific device mapping for GB10 VRAM efficiency.
+- **Remote Operation**: Client runs on any machine, server runs on GPU machine
+- **Language-Specific Rules**: Tailored review rules for Python, C++, Java, JavaScript, Go, Rust, Shell
+- **Few-Shot Prompting**: Examples of correct diff format improve output quality
+- **Sliding Window**: 50-line overlap between chunks captures cross-boundary issues
+- **Global Context Injection**: First 50 lines (imports) prepended to all chunks
+- **Diff Validation**: Output validated for correct unified diff format
+
+## Server Setup (GPU Machine)
+
+### Start Server
+```bash
+./start_server.sh
+```
+
+### Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SERVER_HOST` | 0.0.0.0 | Bind address (0.0.0.0 = all interfaces) |
+| `SERVER_PORT` | 8000 | Port to listen on |
+| `MODEL_ID` | Qwen/Qwen3-Coder-30B-A3B-Instruct | Model to load |
+
+## Client Usage
+
+### Linux
+```bash
+export REVIEW_SERVER_HOST=192.168.x.x  # GPU server IP
+python review_client.py /path/to/code
+```
+
+### Windows (PowerShell)
+```powershell
+$env:REVIEW_SERVER_HOST = "192.168.x.x"
+python review_client.py C:\path\to\code
+```
+
+### Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REVIEW_SERVER_HOST` | localhost | Server IP address |
+| `REVIEW_SERVER_PORT` | 8000 | Server port |
 
 ## Technical Specifications
 
-### 1. Model Configuration
+### Model Configuration
 - **Model ID**: `Qwen/Qwen3-Coder-30B-A3B-Instruct`
 - **Precision**: `bfloat16` (BF16)
-- **Loading Strategy**: 
-  - `device_map="cuda:0"`
-  - `trust_remote_code=True` (Required for Qwen models)
-  - `max_memory` set implicitly by device capabilities (120GB available).
+- **Device**: `cuda:0` with 120GB VRAM
 
-### 2. Input/Output
-- **Command**: `python codereview.py <input_path>`
-- **Input**:
-  - Valid file path: Reviews the single file.
-  - Valid directory path: Reviews all supported source files within.
-- **Output**:
-  - For input file `filename.ext`, the output is written to `filename.ext_r`.
-  - The output file must contain the **complete original source code** with review comments inserted at relevant lines.
+### Chunking Strategy
+- **Chunk Size**: 300 lines (configurable)
+- **Overlap**: 50 lines between chunks
+- **Global Context**: First 50 lines prepended to all chunks
 
-### 3. Supported File Extensions
-The tool processes the following extensions by default when scanning directories:
-- `.py`, `.c`, `.cpp`, `.h`, `.hpp`, `.cc`, `.java`, `.js`, `.ts`, `.go`, `.rs`, `.sh`
+### Supported File Extensions
+`.py`, `.c`, `.cpp`, `.h`, `.hpp`, `.cc`, `.java`, `.js`, `.ts`, `.go`, `.rs`, `.sh`, `.kt`, `.swift`
 
-### 4. Prompt Engineering
-The system prompt instructs the model to:
-1.  Act as an expert code reviewer.
-2.  Output the code exactly as provided.
-3.  Insert comments starting with `// REVIEW:`, `# REVIEW:`, or `<!-- REVIEW: -->` (language appropriate) immediately *before* the line being discussed.
-4.  Focus on: Logic bugs, Security risks, Performance issues, and Code style/Best practices.
+### Output Format
+- Unified diff format (`.diff` file)
+- Comments use language-appropriate prefix: `# REVIEW:`, `// REVIEW:`
+- Each issue tagged with rule ID: `[CRITICAL-9]`, `[HIGH-1]`, `[MEDIUM-2]`, etc.
 
-### 5. Environment
-- Requires Python 3.10+
-- Dependencies: `torch`, `transformers`, `accelerate` (implicitly).
-- Must be run within the project's virtual environment (`.venv`).
+## Client Files Required
+To run the client on a remote machine, copy:
+- `review_client.py`
+- `rules/` directory (with all rule files)
+- `prompt_rules.md` (fallback rules)
 
-## Execution Flow
-1.  **Initialize**: Load Model and Tokenizer (once).
-2.  **Discovery**: Resolve input argument to a list of files.
-3.  **Process Loop**:
-    - Read source file.
-    - Format Prompt: "Review the following code..."
-    - Generate Response.
-    - Extract code/comments from response.
-    - Write to `*_r` file.
-4.  **Completion**: Print summary of processed files.
+## Review Rules
+Rules are organized by language in `rules/`:
+| File | Languages |
+|------|-----------|
+| `rules_python.md` | Python |
+| `rules_cpp.md` | C, C++, Headers |
+| `rules_java.md` | Java, Kotlin, Swift |
+| `rules_javascript.md` | JavaScript, TypeScript |
+| `rules_go.md` | Go |
+| `rules_rust.md` | Rust |
+| `rules_shell.md` | Bash, Shell |
+
+## Environment Requirements
+- **Python**: 3.10+
+- **Server**: NVIDIA GPU with CUDA, 60GB+ VRAM
+- **Dependencies**: `torch`, `transformers`, `accelerate`
