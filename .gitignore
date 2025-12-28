@@ -38,3 +38,4 @@ errorlog*.txt
 
 # Test Review Results
 *_r
+*.diff
