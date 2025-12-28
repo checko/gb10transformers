@@ -15,10 +15,10 @@ from http.client import HTTPConnection
 # Configuration
 SERVER_HOST = "localhost"
 SERVER_PORT = 8000
-CHUNK_SIZE = 500
+CHUNK_SIZE = 300  # Reduced from 500 for better handling with detailed prompts
 OVERLAP_SIZE = 50  # Lines of overlap between chunks to capture cross-chunk context
 GLOBAL_CONTEXT_LINES = 50  # First N lines (imports/headers) prepended to all chunks
-BASE_TIMEOUT = 120  # Base timeout in seconds for model inference
+BASE_TIMEOUT = 300  # Increased timeout for model inference with larger prompts
 RULES_DIR = Path(__file__).parent / "rules"
 DEFAULT_RULES_FILE = "prompt_rules.md"  # Fallback if no language-specific rules exist
 
