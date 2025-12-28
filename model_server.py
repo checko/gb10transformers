@@ -71,7 +71,7 @@ class ModelWrapper:
         generated_ids = self.model.generate(
             model_inputs.input_ids,
             attention_mask=model_inputs.attention_mask,
-            max_new_tokens=8192,  # Increased for longer diff outputs
+            max_new_tokens=4096,  # A diff for 300 lines shouldn't need more
             temperature=0.2, 
             do_sample=True,
             pad_token_id=self.tokenizer.eos_token_id
