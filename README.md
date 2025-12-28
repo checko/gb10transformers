@@ -89,6 +89,25 @@ source .venv/bin/activate && python check_model_req.py
 ./run_review.sh ./src
 ```
 
+### Client-Server Mode (Fast Iteration)
+
+For developing prompts or reviewing many files without reloading the model:
+
+1. **Start the Server** (Loads model once):
+   ```bash
+   ./start_server.sh &
+   ```
+
+2. **Run Client** (Instant reviews):
+   ```bash
+   # Reviews using current prompt_rules.md
+   python review_client.py test_review/bad_python.py
+   ```
+
+3. **Iterate**:
+   - Edit `prompt_rules.md`.
+   - Re-run `review_client.py` to see changes immediately.
+
 The tool uses `Qwen/Qwen3-Coder-30B-A3B-Instruct` to analyze code for bugs, security risks, and style issues, inserting comments directly into a copy of the source code.
 
 ## Hardware Requirements
