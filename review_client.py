@@ -15,12 +15,39 @@ from http.client import HTTPConnection
 SERVER_HOST = "localhost"
 SERVER_PORT = 8000
 CHUNK_SIZE = 500
-PROMPT_FILE = "prompt_rules.md"
+RULES_DIR = Path(__file__).parent / "rules"
+DEFAULT_RULES_FILE = "prompt_rules.md"  # Fallback if no language-specific rules exist
 
 SUPPORTED_EXTENSIONS = {
     '.py', '.c', '.cpp', '.h', '.hpp', '.cc', 
     '.java', '.js', '.ts', '.go', '.rs', '.sh', 
     '.kt', '.swift'
+}
+
+# Map file extensions to their language-specific rule files
+LANGUAGE_RULE_MAP = {
+    # Python
+    '.py': 'rules_python.md',
+    # C/C++
+    '.c': 'rules_cpp.md',
+    '.cpp': 'rules_cpp.md',
+    '.cc': 'rules_cpp.md',
+    '.h': 'rules_cpp.md',
+    '.hpp': 'rules_cpp.md',
+    # Java/Kotlin
+    '.java': 'rules_java.md',
+    '.kt': 'rules_java.md',
+    # JavaScript/TypeScript
+    '.js': 'rules_javascript.md',
+    '.ts': 'rules_javascript.md',
+    # Go
+    '.go': 'rules_go.md',
+    # Rust
+    '.rs': 'rules_rust.md',
+    # Shell
+    '.sh': 'rules_shell.md',
+    # Swift (uses Java rules as closest match)
+    '.swift': 'rules_java.md',
 }
 
 def get_comment_style(file_extension: str) -> str:
@@ -32,12 +59,26 @@ def get_comment_style(file_extension: str) -> str:
     else:
         return "REVIEW: "
 
-def load_prompt_template():
+def load_prompt_template(file_extension: str) -> str:
+    """Load the appropriate rule file based on file extension."""
+    ext = file_extension.lower()
+    
+    # Try language-specific rules first
+    if ext in LANGUAGE_RULE_MAP:
+        rule_file = RULES_DIR / LANGUAGE_RULE_MAP[ext]
+        if rule_file.exists():
+            with open(rule_file, 'r', encoding='utf-8') as f:
+                return f.read()
+        else:
+            print(f"[WARN] Rule file '{rule_file}' not found, falling back to default.")
+    
+    # Fallback to default rules
+    default_path = Path(__file__).parent / DEFAULT_RULES_FILE
     try:
-        with open(PROMPT_FILE, 'r') as f:
+        with open(default_path, 'r', encoding='utf-8') as f:
             return f.read()
     except FileNotFoundError:
-        print(f"[ERROR] Prompt file '{PROMPT_FILE}' not found.")
+        print(f"[ERROR] Default prompt file '{DEFAULT_RULES_FILE}' not found.")
         sys.exit(1)
 
 def send_request(code: str, prompt: str, timeout: int) -> str:
@@ -73,9 +114,9 @@ def review_file(file_path: Path):
 
     comment_prefix = get_comment_style(file_path.suffix)
     line_count = len(content.splitlines())
-    prompt_template = load_prompt_template()
+    prompt_template = load_prompt_template(file_path.suffix)
     
-    print(f"Reviewing {file_path} ({line_count} lines)...")
+    print(f"Reviewing {file_path} ({line_count} lines) [Rules: {LANGUAGE_RULE_MAP.get(file_path.suffix.lower(), 'default')}]...")
     
     full_diff = ""
     
