@@ -18,6 +18,7 @@ SERVER_PORT = 8000
 CHUNK_SIZE = 500
 OVERLAP_SIZE = 50  # Lines of overlap between chunks to capture cross-chunk context
 GLOBAL_CONTEXT_LINES = 50  # First N lines (imports/headers) prepended to all chunks
+BASE_TIMEOUT = 120  # Base timeout in seconds for model inference
 RULES_DIR = Path(__file__).parent / "rules"
 DEFAULT_RULES_FILE = "prompt_rules.md"  # Fallback if no language-specific rules exist
 
@@ -190,7 +191,7 @@ def review_file(file_path: Path):
         
         chunk_lines = chunk_end - chunk_start + 1
         # Dynamic timeout: Base 30s + 0.5s per line
-        dynamic_timeout = int(30 + (chunk_lines * 0.5))
+        dynamic_timeout = int(BASE_TIMEOUT + (chunk_lines * 0.5))
         
         print(f"  -> Chunk {chunk_start}-{chunk_end} (Timeout: {dynamic_timeout}s)...")
         
