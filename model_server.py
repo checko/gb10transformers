@@ -50,6 +50,9 @@ class ModelWrapper:
             sys.exit(1)
 
     def generate(self, code_content, system_prompt):
+        import time
+        start_time = time.time()
+        
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Filename: input_file\n\n{code_content}"}
@@ -62,11 +65,13 @@ class ModelWrapper:
         )
         
         model_inputs = self.tokenizer([text], return_tensors="pt").to(self.device)
+        input_tokens = model_inputs.input_ids.shape[1]
+        print(f"[SERVER] Input tokens: {input_tokens}")
 
         generated_ids = self.model.generate(
             model_inputs.input_ids,
             attention_mask=model_inputs.attention_mask,
-            max_new_tokens=4096,
+            max_new_tokens=8192,  # Increased for longer diff outputs
             temperature=0.2, 
             do_sample=True,
             pad_token_id=self.tokenizer.eos_token_id
@@ -77,6 +82,11 @@ class ModelWrapper:
         ]
         
         response = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+        
+        elapsed = time.time() - start_time
+        output_tokens = len(generated_ids[0])
+        print(f"[SERVER] Generated {output_tokens} tokens in {elapsed:.1f}s ({output_tokens/elapsed:.1f} tok/s)")
+        
         return self._clean_response(response)
 
     def _clean_response(self, response: str) -> str:
