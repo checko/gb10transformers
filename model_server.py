@@ -11,10 +11,10 @@ import torch
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Configuration
-MODEL_ID = "Qwen/Qwen3-Coder-30B-A3B-Instruct"
-PORT = 8000
-HOST = "localhost"
+# Configuration - can be overridden via environment variables
+MODEL_ID = os.getenv("MODEL_ID", "Qwen/Qwen3-Coder-30B-A3B-Instruct")
+PORT = int(os.getenv("SERVER_PORT", "8000"))
+HOST = os.getenv("SERVER_HOST", "0.0.0.0")  # Bind to all interfaces for remote access
 
 class ModelWrapper:
     def __init__(self):

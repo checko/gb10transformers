@@ -4,6 +4,7 @@ AI Code Review Client
 Sends code and dynamic prompts to the Model Server.
 """
 
+import os
 import sys
 import json
 import glob
@@ -12,9 +13,10 @@ import re
 from pathlib import Path
 from http.client import HTTPConnection
 
-# Configuration
-SERVER_HOST = "localhost"
-SERVER_PORT = 8000
+# Configuration - can be overridden via environment variables
+# Set REVIEW_SERVER_HOST to connect to remote GPU server
+SERVER_HOST = os.getenv("REVIEW_SERVER_HOST", "localhost")
+SERVER_PORT = int(os.getenv("REVIEW_SERVER_PORT", "8000"))
 CHUNK_SIZE = 300  # Reduced from 500 for better handling with detailed prompts
 OVERLAP_SIZE = 50  # Lines of overlap between chunks to capture cross-chunk context
 GLOBAL_CONTEXT_LINES = 50  # First N lines (imports/headers) prepended to all chunks
