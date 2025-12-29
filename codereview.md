@@ -77,9 +77,46 @@ python review_client.py C:\path\to\code
 
 ## Client Files Required
 To run the client on a remote machine, copy:
-- `review_client.py`
+- `review_client.py` (for local model server)
+- `review_client_ollama.py` (for Ollama API)
 - `rules/` directory (with all rule files)
 - `prompt_rules.md` (fallback rules)
+
+## Ollama Alternative
+
+Use `review_client_ollama.py` to leverage a remote Ollama server instead of the local model server.
+
+### Usage
+```bash
+# Default configuration
+python review_client_ollama.py /path/to/code
+
+# Custom Ollama server
+export OLLAMA_HOST=192.168.x.x
+export OLLAMA_MODEL=qwen3-coder:30b
+python review_client_ollama.py ./src
+```
+
+### Environment Variables
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_HOST` | 192.168.145.70 | Ollama server IP |
+| `OLLAMA_PORT` | 11434 | Ollama server port |
+| `OLLAMA_MODEL` | qwen3-coder:30b | Model name |
+
+### API Endpoint
+Uses Ollama's native chat API: `POST /api/chat`
+
+### Output Files
+- Local model server: `*.diff`
+- Ollama client: `*.ollama.diff`
+
+### Comparing Results
+```bash
+python review_client.py file.py        # → file.py.diff
+python review_client_ollama.py file.py  # → file.py.ollama.diff
+diff file.py.diff file.py.ollama.diff  # Compare outputs
+```
 
 ## Review Rules
 Rules are organized by language in `rules/`:

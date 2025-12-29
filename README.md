@@ -41,6 +41,9 @@ pip install -r requirements.txt
 | File | Description |
 |------|-------------|
 | `codereview.py` | AI Code Reviewer using Qwen3-Coder-30B |
+| `review_client.py` | Client for local model server review |
+| `review_client_ollama.py` | Client for remote Ollama API review |
+| `model_server.py` | Model server (local GPU) |
 | `run_review.sh` | Execution script for code review (sets env vars) |
 | `check_model_req.py` | VRAM feasibility check for 30B models |
 | `codereview.md` | Feature specification |
@@ -116,7 +119,7 @@ python review_client.py C:\path\to\code
 - **Global Context**: First 50 lines (imports) prepended to all chunks
 - **Diff Validation**: Validates output for correct unified diff format
 
-### Environment Variables
+### Environment Variables (Local Model Server)
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REVIEW_SERVER_HOST` | localhost | Server IP (client) |
@@ -124,13 +127,41 @@ python review_client.py C:\path\to\code
 | `SERVER_HOST` | 0.0.0.0 | Bind address (server) |
 | `SERVER_PORT` | 8000 | Listen port (server) |
 
+### Ollama Alternative
+Use `review_client_ollama.py` to review code via a remote Ollama server:
+
+```bash
+# Default: uses 192.168.145.70:11434 with qwen3-coder:30b
+python review_client_ollama.py file.py
+
+# Custom server/model
+export OLLAMA_HOST=your-server.local
+export OLLAMA_MODEL=qwen3-coder:30b
+python review_client_ollama.py ./src
+```
+
+**Ollama Environment Variables:**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OLLAMA_HOST` | 192.168.145.70 | Ollama server IP |
+| `OLLAMA_PORT` | 11434 | Ollama server port |
+| `OLLAMA_MODEL` | qwen3-coder:30b | Model name |
+
+### Comparing Results
+Run both clients to compare local vs Ollama model outputs:
+```bash
+python review_client.py file.py        # → file.py.diff
+python review_client_ollama.py file.py  # → file.py.ollama.diff
+diff file.py.diff file.py.ollama.diff
+```
+
 ### Client Files (for remote machines)
 Copy to any machine:
-- `review_client.py`
+- `review_client.py` or `review_client_ollama.py`
 - `rules/` directory
 - `prompt_rules.md`
 
-The tool uses `Qwen/Qwen3-Coder-30B-A3B-Instruct` to analyze code for bugs, security risks, and style issues.
+The tool uses `Qwen/Qwen3-Coder-30B-A3B-Instruct` (local) or `qwen3-coder:30b` (Ollama) to analyze code for bugs, security risks, and style issues.
 
 ## Hardware Requirements
 
